@@ -324,12 +324,23 @@ describe("discoverCommands", () => {
 
   it("caps how many commands it publishes", async () => {
     for (const plugin of ["one", "two", "three"]) {
-      for (let index = 0; index < 60; index += 1) {
+      for (let index = 0; index < 200; index += 1) {
         writeGlobalSkill(`.gemini/config/plugins/${plugin}/skills`, `skill_${index}`, skill(`name: s-${index}\ndescription: Many`));
       }
     }
 
-    expect((await discoverCommands(workspace)).commands).toHaveLength(128);
+    expect((await discoverCommands(workspace)).commands).toHaveLength(512);
+  });
+
+  it("discovers more than 128 shared skills without cutting off late-alphabet names", async () => {
+    for (let index = 0; index < 140; index += 1) {
+      const name = `shared-${String(index).padStart(3, "0")}`;
+      writeGlobalSkill(".agents/skills", name, skill(`name: ${name}\ndescription: Shared`));
+    }
+    writeGlobalSkill(".agents/skills", "what-did-you-learn", skill("name: what-did-you-learn\ndescription: Reflect"));
+
+    const discovered = await discoverCommands(workspace);
+    expect(discovered.commands.some((command) => command.name === "what-did-you-learn")).toBe(true);
   });
 
   it("leaves a shared skill to the command the CLI expands itself", async () => {
