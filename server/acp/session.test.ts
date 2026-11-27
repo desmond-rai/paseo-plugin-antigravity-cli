@@ -28,6 +28,7 @@ import {
 import type { AcpPromptResult } from "./schema";
 import {
   createAcpConnection,
+  mergeAvailableCommands,
   type AcpConnectionOptions,
   type OneShotArgs,
   type OneShotResult,
@@ -972,11 +973,28 @@ describe("ACP Session & Connection (Phase 3a)", () => {
     expect(skillCmds[0].name).toBe("SKILL");
     expect(skillCmds[1].name).toBe("SKILL (2)");
 
-    // System commands preserved
+    // System commands preserved without duplicating overlapping ACP built-ins
     expect(lastCmds.some((c: any) => c.name === "compact")).toBe(true);
     expect(lastCmds.some((c: any) => c.name === "plan")).toBe(true);
+    expect(lastCmds.some((c: any) => c.name === "plan (2)")).toBe(false);
 
     await connection.close();
+  });
+
+  it("slash commands: preserves >128 commands and deduplicates overlapping system commands", () => {
+    const many = [
+      { name: "plan", description: "ACP plan" },
+      { name: "compact", description: "ACP compact" },
+      ...Array.from({ length: 150 }, (_, i) => ({
+        name: `skill-${String(i).padStart(3, "0")}`,
+        description: `Skill ${i}`,
+      })),
+      { name: "what-did-you-learn", description: "Reflect" },
+    ];
+    const merged = mergeAvailableCommands(many);
+    expect(merged.some((c) => c.name === "what-did-you-learn")).toBe(true);
+    expect(merged.some((c) => c.name === "plan (2)")).toBe(false);
+    expect(merged.some((c) => c.name === "compact (2)")).toBe(false);
   });
 
   it("crash recovery: fails running turn, then next prompt relaunches and resumes session", async () => {

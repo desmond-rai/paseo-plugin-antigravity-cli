@@ -109,7 +109,7 @@ type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string
 export type ProviderToolCallItem = Extract<ProviderTimelineItem, { type: "tool_call" }>;
 
 const COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const MAX_COMMANDS = 128;
+const MAX_COMMANDS = 512;
 
 const KNOWN_VENDOR_TOOLS = new Set([
   "run_command",
@@ -225,7 +225,9 @@ export function mergeAvailableCommands(
   availableCommands: Array<{ name?: string; description?: string }>,
 ): ProviderCommand[] {
   const map = new Map<string, ProviderCommand>();
+  const systemNames = new Set<string>();
   for (const cmd of SYSTEM_COMMANDS) {
+    systemNames.add(cmd.name);
     map.set(cmd.name, {
       name: cmd.name,
       description: cmd.description,
@@ -234,7 +236,7 @@ export function mergeAvailableCommands(
   for (const cmd of availableCommands) {
     if (!cmd.name) continue;
     const baseName = cmd.name.trim();
-    if (!baseName) continue;
+    if (!baseName || systemNames.has(baseName)) continue;
 
     let candidateName = baseName;
     let counter = 2;

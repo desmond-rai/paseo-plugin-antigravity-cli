@@ -137,8 +137,8 @@ export interface ExpandedSkill {
  * cuts them off: 64 was already full on 2026-10-16 with 9 workflows, 22 plugin skills, 9 built-ins
  * and 45 shared skills, which dropped every shared skill after `paseo`.
  */
-const MAX_DIRS_PER_ROOT = 64;
-const MAX_COMMANDS = 128;
+const MAX_DIRS_PER_ROOT = 512;
+const MAX_COMMANDS = 512;
 const SKILL_HEAD_BYTES = 4 * 1024;
 const DESCRIPTION_LIMIT = 240;
 
@@ -309,11 +309,20 @@ function remember(commands: Map<string, AgyCommand>, command: AgyCommand): void 
 async function subdirectories(root: string): Promise<string[]> {
   try {
     const entries = await readdir(root, { withFileTypes: true });
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => join(root, entry.name))
-      .sort()
-      .slice(0, MAX_DIRS_PER_ROOT);
+    const dirs: string[] = [];
+    for (const entry of entries) {
+      const full = join(root, entry.name);
+      if (entry.isDirectory()) {
+        dirs.push(full);
+      } else if (entry.isSymbolicLink()) {
+        try {
+          if ((await stat(full)).isDirectory()) dirs.push(full);
+        } catch {
+          // Broken symlink; ignore.
+        }
+      }
+    }
+    return dirs.sort().slice(0, MAX_DIRS_PER_ROOT);
   } catch {
     return [];
   }
